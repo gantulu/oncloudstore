@@ -1,13 +1,168 @@
-<!-- index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>oncloudstore</title>
+  <meta charset="UTF-8">
+  <title>Produk Detail</title>
+  <style>
+    .color-options { display: flex; gap: 10px; margin-top: 10px; }
+    .color-option { border: 2px solid transparent; border-radius: 8px; padding: 4px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .color-option img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; }
+    .color-option input { display: none; }
+    .color-option.selected { border-color: blue; }
+    .selected-color-label, .selected-size-label { font-weight: bold; margin-bottom: 5px; }
+
+    /* Carousel sederhana */
+    #sliderAdditionalImageLink { display: flex; gap: 5px; margin: 10px 0; overflow-x: auto; }
+    #sliderAdditionalImageLink img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; flex-shrink: 0; }
+    #sliderAdditionalImageLink img:hover { border-color: blue; }
+
+    .main-image { width: 250px; }
+    .size-container select { width: 100px; }
+    .add-to-cart-btn { margin-top: 10px; padding: 8px 12px; font-weight: bold; cursor: pointer; }
+  </style>
 </head>
 <body>
-  <h1>Selamat datang di oncloudstore.online!</h1>
-  <p>Website ini di-host melalui GitHub Pages 🎉</p>
+<div id="itmidProduk" class="produk-detail"></div>
+
+<script>
+const urlParams = new URLSearchParams(window.location.search);
+const itmid = urlParams.get("itmid");
+const apiUrl = "https://opensheet.elk.sh/1wPp2yg7C9FeiDuShkQaRpEoYsax0oGKgCbGuGWC2JUU/Produk";
+
+function formatRupiah(number) {
+  if(!number) return "Rp0";
+  return "Rp" + Number(number).toLocaleString('id-ID');
+}
+
+fetch(apiUrl)
+  .then(res => res.json())
+  .then(data => {
+    const produk = data.filter(item => item.item_group_id === itmid);
+    if (!produk.length) {
+      document.getElementById("itmidProduk").innerHTML = "<p>Produk tidak ditemukan</p>";
+      return;
+    }
+
+    let selectedColor = produk[0].color || '-';
+    let filteredByColor = produk.filter(p => p.color === selectedColor);
+    let main = filteredByColor[0];
+
+    // HTML dasar
+    let html = `
+      <img id="mainImage" class="main-image" src="${main.image_link || 'https://via.placeholder.com/250'}" alt="${main.title}">
+      <p class="product-title"><strong>${main.title}</strong></p>
+      <p class="product-gender">Gender: ${main.gender}</p>
+      <p class="product-price">Harga: <s>${formatRupiah(main.price)}</s> <strong>${formatRupiah(main.sale_price)}</strong></p>
+      <p class="deskripsii"> Deskripsi :</p>
+      <p class="product-description">${main.description}</p>
+      <p class="selected-color-label" id="selectedColorLabel">Warna dipilih: ${selectedColor}</p>
+      <div class="color-options" id="colorOptions"></div>
+      <p class="selected-size-label" id="selectedSizeLabel">Ukuran dipilih: 40</p>
+      <div class="size-container" id="sizeContainer"></div>
+
+    `;
+    document.getElementById("itmidProduk").innerHTML = html;
+
+    // Render slider tambahan hanya jika ada
+    if (main.additional_image_link && main.additional_image_link.trim() !== "") {
+      const sliderDiv = document.createElement("div");
+      sliderDiv.id = "sliderAdditionalImageLink";
+      sliderDiv.style.display = "flex";
+      sliderDiv.style.gap = "5px";
+      sliderDiv.style.margin = "10px 0";
+
+      let images = main.additional_image_link.split(",").map(l => l.trim()).filter(l => l);
+      images.forEach(link => {
+        const img = document.createElement("img");
+        img.src = link;
+        img.alt = main.title;
+        img.addEventListener("click", () => { document.getElementById("mainImage").src = link; });
+        sliderDiv.appendChild(img);
+      });
+
+      document.getElementById("itmidProduk").insertBefore(sliderDiv, document.querySelector(".product-title"));
+    }
+
+    // Color variants
+    const warnaUnik = [...new Map(produk.map(p => [p.color, p])).values()];
+    const colorOptions = document.getElementById("colorOptions");
+    const selectedColorLabel = document.getElementById("selectedColorLabel");
+
+    function updateVariantByColor(color) {
+      selectedColor = color;
+      filteredByColor = produk.filter(p => p.color === selectedColor);
+      main = filteredByColor[0];
+      document.getElementById("mainImage").src = main.image_link || 'https://via.placeholder.com/250';
+
+      // Update slider jika ada
+      const existingSlider = document.getElementById("sliderAdditionalImageLink");
+      if (existingSlider) existingSlider.remove();
+      if (main.additional_image_link && main.additional_image_link.trim() !== "") {
+        const sliderDiv = document.createElement("div");
+        sliderDiv.id = "sliderAdditionalImageLink";
+        sliderDiv.style.display = "flex";
+        sliderDiv.style.gap = "5px";
+        sliderDiv.style.margin = "10px 0";
+
+        let images = main.additional_image_link.split(",").map(l => l.trim()).filter(l => l);
+        images.forEach(link => {
+          const img = document.createElement("img");
+          img.src = link;
+          img.alt = main.title;
+          img.addEventListener("click", () => { document.getElementById("mainImage").src = link; });
+          sliderDiv.appendChild(img);
+        });
+
+        document.getElementById("itmidProduk").insertBefore(sliderDiv, document.querySelector(".product-title"));
+      }
+
+      selectedColorLabel.textContent = "Warna dipilih: " + selectedColor;
+    }
+
+    warnaUnik.forEach(item => {
+      const wrapper = document.createElement("label");
+      wrapper.classList.add("color-option");
+      if (item.color === selectedColor) wrapper.classList.add("selected");
+      wrapper.innerHTML = `<input type="radio" name="warna" value="${item.color}" ${item.color===selectedColor?"checked":""}><img src="${item.image_link||'https://via.placeholder.com/70'}" alt="${item.color}">`;
+      colorOptions.appendChild(wrapper);
+      wrapper.addEventListener("click", () => {
+        document.querySelectorAll(".color-option").forEach(el=>el.classList.remove("selected"));
+        wrapper.classList.add("selected");
+        updateVariantByColor(item.color);
+      });
+    });
+
+    // Size dropdown
+    const daftarUkuran = [40,40.5,41,42,42.5,43,44,44.5,45,46,47,47.5,48,48.5,49,50];
+    let ukuranHtml = `<select id="ukuran" class="size-select">`;
+    daftarUkuran.forEach(u=>{ ukuranHtml+=`<option value="${u}">${u}</option>`; });
+    ukuranHtml += `</select>`;
+    document.getElementById("sizeContainer").innerHTML = ukuranHtml;
+
+    const ukuranSelect = document.getElementById("ukuran");
+    const selectedSizeLabel = document.getElementById("selectedSizeLabel");
+    selectedSizeLabel.textContent = "Ukuran dipilih: "+ukuranSelect.value;
+    ukuranSelect.addEventListener("change",()=>{ selectedSizeLabel.textContent="Ukuran dipilih: "+ukuranSelect.value; });
+
+    // Add to cart
+    const addCartHtml=`<button class="add-to-cart-btn" id="addToCart">Add to Cart</button>`;
+    document.getElementById("itmidProduk").insertAdjacentHTML('beforeend', addCartHtml);
+    document.getElementById("addToCart").addEventListener("click", ()=>{
+      const cartItem = {
+        title: main.title,
+        gender: main.gender,
+        image_link: document.getElementById("mainImage").src,
+        color: selectedColor,
+        ukuran: ukuranSelect.value,
+        price: main.price,
+        sale_price: main.sale_price
+      };
+      let cart = JSON.parse(localStorage.getItem("cart")) || [];
+      cart.push(cartItem);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      window.location.href = "/cart"; // redirect
+    });
+  });
+</script>
 </body>
 </html>
